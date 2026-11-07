@@ -1,120 +1,382 @@
-# Order-Events Pipeline — chunked, idempotent, observable
+# Order Events Data Pipeline
+### A Chunked, Idempotent & Observable Data Engineering Pipeline
 
-Streams **large CSV / JSON-Lines** order-event files into a SQLite analytical store **without ever loading the
-file into memory**. Bad rows go to a traceable quarantine table, reruns are safe, a crashed load resumes where it
-stopped, and a reconciliation report proves the output is correct against labels produced independently by the data generator.
+A production-style Python data engineering pipeline that processes large CSV and JSONL order-event files into an analytical SQLite database using memory-efficient, chunk-based ingestion.
 
-* Python 3.9+ standard library only (pytest for tests). No services, no secrets.
-* **58 automated tests**, 150,000+ record run reconciles 18/18 in ~5 s using ~44 MB RAM.
+The pipeline implements end-to-end data processing, including streaming ingestion, schema validation, data quality checks, duplicate detection, quarantine handling, incremental loading, failure recovery, reporting, and source-to-target reconciliation.
 
-## 1. Quick start (clean environment)
+**Key Highlights**
+- Processes 150,000+ records with approximately 44 MB peak memory.
+- Achieves approximately 27,000–28,000 records per second.
+- Supports CSV and JSON Lines (JSONL) input formats.
+- Implements transaction-based chunk processing and checkpoint recovery.
+- Maintains complete event history with out-of-order event detection.
+- Includes 58 automated tests and 18 reconciliation checks.
+- Uses Python 3.9+ standard library and SQLite, with pytest for testing.
+
+---
+
+## 1. Project Overview
+
+The pipeline addresses common data engineering challenges associated with processing large datasets reliably and efficiently.
+
+Instead of loading entire files into memory, records are streamed individually and processed in configurable chunks. Each chunk is validated, transformed, and written to SQLite within a transaction.
+
+Invalid records are stored in a quarantine table with their original source information, while valid records are loaded into analytical fact and dimension tables.
+
+The pipeline also supports safe reruns, recovery from partial failures, operational monitoring, and independent reconciliation to verify data correctness.
+
+## 2. Technology Stack
+
+| Category | Technologies |
+|---|---|
+| Programming Language | Python 3.9+ |
+| Data Processing | Python Generators, Chunking, Iterators |
+| Database | SQLite, SQL |
+| Input Formats | CSV, JSONL |
+| Data Quality | Schema Validation, Business Rule Checks |
+| Testing | Pytest (58 automated tests) |
+| Reporting | SQL, CSV, JSON, Markdown |
+| Performance Monitoring | Execution Time, Throughput, Peak Memory |
+| Version Control | Git, GitHub |
+
+**Dependencies:** Python standard library, with pytest for automated testing. No external services, API credentials, or cloud infrastructure required.
+
+## 3. Architecture & Data Flow
+
+```text
+              SOURCE FILES
+             /            \
+       customers.csv    order_events.csv / JSONL
+             |                   |
+             v                   v
+      Load Customers        Record Reader
+             |                   |
+             v                   v
+      dim_customers         Schema Validation
+             |                   |
+             |                   v
+             |              Chunk Processing
+             |                   |
+             |                   v
+             |             Data Validation
+             |                   |
+             |          +--------+--------+
+             |          |                 |
+             |       Valid Rows       Invalid Rows
+             |          |                 |
+             |          v                 v
+             |     Reference Check   Quarantine Table
+             |          |             rejected_records
+             |          v
+             |     Duplicate Check
+             |          |
+             |          v
+             |   fact_order_events
+             |          |
+             +----------+
+                        |
+                        v
+                Transaction Commit
+                 + Checkpoint
+                        |
+                        v
+                Reporting Layer
+                 /     |      \
+                v      v       v
+              Views  CSV     Reconciliation
+                     Reports    Reports
+```
+
+**Core processing modules:**
+
+| Module | Responsibility |
+|---|---|
+| `readers.py` | Streaming CSV and JSONL readers |
+| `validation.py` | Schema and business-rule validation |
+| `loader.py` | Chunk processing, idempotency, and restart |
+| `db.py` | Database schema and connection management |
+| `reports.py` | Analytical reports and CSV exports |
+| `reconcile.py` | Source-to-target reconciliation |
+| `generator.py` | Reproducible synthetic data generation |
+| `cli.py` | Command-line interface |
+| `benchmark.py` | Performance and memory benchmarking |
+
+## 4. Database Design
+
+The pipeline uses a relational analytical model with separate dimension, fact, operational, and reporting structures.
+
+| Table / View | Purpose |
+|---|---|
+| `dim_customers` | Customer reference and descriptive information |
+| `fact_order_events` | Immutable order-event history |
+| `rejected_records` | Invalid and rejected source records |
+| `file_ledger` | File-level processing status and checkpoints |
+| `pipeline_runs` | Execution metadata and operational metrics |
+| `v_order_current` | Derived current order state |
+| `rpt_daily_revenue` | Aggregated daily revenue reporting |
+
+**Data modelling decisions:**
+- One fact record represents one order event.
+- `event_id` is the primary key for event-level uniqueness.
+- Customer references are validated before event insertion.
+- Foreign-key relationships protect referential integrity.
+- Event history is append-only.
+- Current order status is derived using event timestamps rather than file arrival order.
+- Monetary values are stored as integer cents to avoid floating-point inaccuracies.
+- Timestamps are normalized to ISO-8601 UTC format.
+
+## 5. Data Quality & Business Rules
+
+Each incoming record passes through validation before being published to the analytical tables.
+
+**Validation rules include:**
+
+- Required field and schema validation.
+- Valid event types and currency codes.
+- Non-negative monetary amounts with a maximum of two decimal places.
+- Maximum transaction amount of 1,000,000.00.
+- ISO-8601 timestamp validation and UTC normalization.
+- Customer reference validation.
+- Duplicate event detection.
+- Conflicting event ID detection.
+- Null and malformed record handling.
+
+**Rejected records are stored with:**
+- Rejection reason and reason code.
+- Original raw record.
+- Source file name.
+- Source record number and line number.
+- Pipeline run ID.
+
+This ensures rejected data remains traceable and can be investigated without interrupting the processing of valid records.
+
+## 6. Idempotency, Recovery & Incremental Processing
+
+Reliability is implemented at both the file and record levels.
+
+**Idempotency**
+- SHA-256 file hashing identifies previously processed files.
+- Identical files are skipped without unnecessary writes.
+- Primary-key constraints prevent duplicate event insertion.
+- Identical duplicate events and conflicting duplicate IDs are handled separately.
+- Customer records are safely upserted.
+
+**Checkpoint-based recovery**
+- Each processing chunk is committed within a database transaction.
+- Valid records, rejected records, and checkpoint updates are committed together.
+- Failed executions retain previously committed chunks.
+- Reprocessing resumes from the last committed record when the same file is supplied.
+
+**Late-arriving events**
+- Historical events are preserved.
+- Out-of-order arrivals are flagged.
+- Current order state is calculated from event timestamps.
+- Backfills can introduce new historical events without duplicating existing events.
+
+## 7. Observability & Operational Monitoring
+
+Every pipeline execution generates an operational record containing:
+
+- Unique run ID.
+- Execution start and end timestamps.
+- Source file and processing status.
+- Total records read, loaded, and rejected.
+- Rejection counts grouped by reason.
+- Out-of-order event count.
+- Execution duration.
+- Peak memory usage.
+- Failure reason, when applicable.
+
+Operational outputs include:
+- `pipeline_runs` database table.
+- Per-run JSON execution summaries.
+- Console logging.
+- Optional file-based logs.
+
+This makes pipeline execution traceable and simplifies debugging and operational monitoring.
+
+## 8. Reconciliation & Data Correctness
+
+An independent reconciliation process validates the correctness of the final analytical output.
+
+The data generator creates `expected_answers.json` separately from the pipeline input. The ingestion process never uses these expected results.
+
+The reconciliation process performs 18 checks covering:
+
+1. Records read versus loaded and rejected.
+2. Committed records versus processing counts.
+3. Fact-table counts versus run metrics.
+4. Primary-key uniqueness.
+5. Referential integrity and orphan detection.
+6. Paid transaction amount reconciliation.
+7. Refund amount reconciliation.
+8. Order count validation.
+9. Loaded records versus independent generator labels.
+10. Rejected records versus expected labels.
+11. Rejection counts by reason.
+12. Out-of-order event counts.
+13–18. Additional aggregate and source-to-target consistency checks.
+
+The reconciliation command generates Markdown and JSON reports and returns a non-zero exit code when mismatches are detected.
+
+## 9. Performance & Optimization
+
+The pipeline was benchmarked using increasing input sizes to evaluate throughput and memory consumption.
+
+| Input Records | Execution Time | Throughput | Peak RSS |
+|---:|---:|---:|---:|
+| 50,977 | 1.8 sec | 27.6K/sec | 43.1 MB |
+| 203,896 | 7.3 sec | 28.0K/sec | 44.1 MB |
+| 509,794 | 19.4 sec | 26.3K/sec | 44.6 MB |
+
+**Optimization implemented: Transaction-per-chunk processing**
+
+Initially, committing each record individually resulted in significant transaction overhead.
+
+The implementation was optimized to commit records in configurable chunks.
+
+| Chunk Size | Throughput |
+|---:|---:|
+| 1 | 7.9K records/sec |
+| 100 | 22K records/sec |
+| 1,000 | 27.5K records/sec |
+| 10,000 | 28.8K records/sec |
+
+This improved throughput by approximately 3.6x compared with the single-record transaction approach.
+
+The benchmark also demonstrates that memory consumption remains relatively stable as input size increases.
+
+**Next optimization:** Replace repeated per-record database lookups with batched operations using `executemany` and staging tables with set-based SQL.
+
+## 10. Testing & Edge Cases
+
+The project includes **58 automated tests** covering functional correctness, data quality, recovery, and performance-related behavior.
+
+Test scenarios include:
+
+- Valid CSV and JSONL ingestion.
+- Empty and header-only files.
+- Malformed input records.
+- Missing required columns.
+- Unexpected and reordered schema columns.
+- Null and invalid values.
+- Duplicate and conflicting event IDs.
+- Invalid customer references.
+- Late-arriving and out-of-order events.
+- Partial failure and checkpoint recovery.
+- Reprocessing identical input files.
+- Source-to-target reconciliation.
+- Bounded-memory processing.
+
+Run the complete test suite:
 
 ```bash
-git clone <this repo> && cd order-events-pipeline
-python3 -m pip install -r requirements.txt     # pytest only
-make test                                      # 58 tests
-make demo                                      # starter sample: ingest -> report -> reconcile -> sample queries
-make scale ROWS=150000                         # 150k+ rows, same flow, prints memory + timing
-make bench                                     # scaling + chunk-size measurement
+make test
 ```
-No `make`? Each target is just a `python3 -m order_pipeline <command>`; see `Makefile`.
 
-| command | purpose |
-|---|---|
-| `generate --rows N --seed S [--format csv\|jsonl] [--edge-case-files]` | reproducible synthetic data + `expected_answers.json` labels |
-| `ingest --customers F --events F [--db] [--chunk-size] [--inject-failure-after-chunks N]` | load customers, then events |
-| `report` | rebuild `rpt_daily_revenue`, export CSV reports |
-| `reconcile --expected expected_answers.json` | source→target reconciliation (exit code 1 on FAIL) |
-| `query --sql-file sql/sample_queries.sql` | run the demo queries |
-| `benchmark` | throughput / peak-memory / chunk-size sweep |
+## 11. Project Setup & Execution
 
-## 2. Architecture / data flow
+### Prerequisites
 
+- Python 3.9 or later.
+- Git.
+- Pytest.
+
+### Clone the repository
+
+```bash
+git clone <your-repository-url>
+cd order-events-pipeline
 ```
- customers.csv ─────────────► load_customers (upsert) ──► dim_customers ─┐ (FK / ref. check)
-                                                                          │
- order_events.csv|.jsonl                                                  ▼
-   │  RecordReader  (streams 1 record at a time; schema check on header)
-   │      │ malformed row ───────────────────────────────┐
-   ▼      ▼                                              │
- chunked(N rows) ─► validate_event (pure rules) ─► reference check ─► duplicate check
-                         │ reject                    │ reject            │ reject
-                         └──────────────┬────────────┴───────────────────┘
-                                        ▼
-                              rejected_records  (reason_code, raw_record, file, record_no, line)
-   valid rows ─► fact_order_events (immutable event history, is_out_of_order flag)
-   ── ONE transaction per chunk: facts + rejects + checkpoint (file_ledger.committed_records) ──
-                                        │
-   pipeline_runs (run_id, status, counts, failure_reason) + runs/<run_id>.json + log
-                                        ▼
-        v_order_current (view, derived)   rpt_daily_revenue (rebuilt)   CSV exports   reconciliation_report.{md,json}
+
+### Install dependencies
+
+```bash
+python3 -m pip install -r requirements.txt
 ```
-Modules: `readers.py` (streaming I/O) · `validation.py` (pure rules) · `loader.py` (chunking, idempotency,
-restart) · `db.py` (schema) · `reports.py` · `reconcile.py` · `generator.py` · `cli.py` · `benchmark.py`.
 
-## 3. How the requirements are met
+### Run automated tests
 
-| Requirement | Where / how |
+```bash
+make test
+```
+
+### Run the complete demonstration
+
+```bash
+make demo
+```
+
+The demonstration executes ingestion, reporting, reconciliation, and sample analytical queries.
+
+### Run a larger dataset
+
+```bash
+make scale ROWS=150000
+```
+
+### Run performance benchmarks
+
+```bash
+make bench
+```
+
+### Generate a custom dataset
+
+```bash
+python3 -m order_pipeline generate \
+    --rows 1000000 \
+    --seed 42 \
+    --out-dir big
+```
+
+### Available CLI Commands
+
+| Command | Description |
 |---|---|
-| Bounded memory | `RecordReader` is a generator; `chunked()` holds one chunk; cursor-streamed exports; bounded `lru_cache` for customer lookups. Peak RSS **43→45 MB while input grew 10×** (`sample_output/benchmark_results.md`); a test asserts Python-level memory is flat for 4× input. |
-| Schema validation | Missing required column ⇒ whole file `FAILED` (`SCHEMA_MISMATCH`), nothing loaded, ledger `FAILED_SCHEMA`. Extra/re-ordered columns tolerated with a warning. |
-| Business rules | See data dictionary: required fields, enum event types/currencies, amount ≥ 0 with ≤ 2 decimals and ≤ 1,000,000.00, ISO-8601 timestamps normalised to UTC, customer must exist. |
-| Duplicates | `event_id` is the PK. Same content ⇒ `DUPLICATE_EVENT`; same id, different content ⇒ `CONFLICTING_DUPLICATE`. **First wins; nothing is silently overwritten.** |
-| Reject path | `rejected_records` keeps reason, detail, raw source row, `source_file`, `source_record_no`, `source_line`, `run_id`. |
-| Late / out-of-order | Facts are append-only; `is_out_of_order=1` when a later-timestamped event of the order was already loaded; current state is *derived* by `event_ts` (view `v_order_current`), so arrival order never corrupts status. |
-| Idempotency | file `sha256` ledger (same file ⇒ `SKIPPED`), PK on events, deterministic reject ids (`INSERT OR REPLACE`), reports rebuilt from scratch, customers upserted. |
-| Retry / restart | Chunk commit includes a checkpoint. A failed run is `FAILED` with `failure_reason`; the next run of the same file **resumes after the last committed record** (demo: `--inject-failure-after-chunks 2`). |
-| Backfill | A new file overlapping old data is safe: replays are rejected as `DUPLICATE_EVENT`; genuinely new/late events load and are flagged out-of-order. |
-| Observability | per-run row in `pipeline_runs`, `output/runs/<run_id>.json` (start/end, read/loaded/rejected/out-of-order, rejects by reason, failure reason, duration, peak RSS), console + optional `--log-file`. |
-| Reconciliation | 18 checks: `read = loaded + rejected` per run, committed records = rows read, fact vs run log, no dup keys, no orphans, paid/refund cents fact vs report, order counts, **plus equality with generator labels** (loaded, rejected, rejects by reason, out-of-order, orders, paid/refund cents). |
+| `generate` | Generate reproducible synthetic datasets |
+| `ingest` | Load customer and order-event files |
+| `report` | Rebuild analytical reports |
+| `reconcile` | Validate source-to-target correctness |
+| `query` | Execute sample SQL queries |
+| `benchmark` | Measure throughput and memory usage |
 
-## 4. Run behaviour cheat-sheet
+All commands can be configured through their available CLI arguments. See the Makefile and CLI help for details.
 
-| Situation | Result |
+## 12. Sample Data & Reproducibility
+
+The repository includes:
+- A starter dataset containing approximately 505 rows.
+- Synthetic customer and order-event files.
+- Deliberately invalid records covering different edge cases.
+- Schema-change and empty-input samples.
+- Independent expected-answer labels.
+- Sample SQL queries and generated reports.
+- Benchmark results and test execution evidence.
+
+A fixed random seed ensures reproducible dataset generation. The generator also uses bounded-memory processing.
+
+## 13. Limitations & Future Improvements
+
+Current implementation decisions and potential improvements:
+
+| Current Design | Potential Improvement |
 |---|---|
-| Re-run identical file | `SKIPPED`, zero writes |
-| Crash mid-file / DB error | `FAILED`, committed chunks kept, **re-run resumes** |
-| Header-only or zero-byte file | `SUCCESS`, 0 rows, warning `EMPTY_INPUT` |
-| Missing required column | `FAILED` (`SCHEMA_MISMATCH: …`), exit code 2, no data written |
-| Input path missing | `FAILED`, recorded in `pipeline_runs` |
-| Bad row | quarantined, run continues |
+| SQLite analytical storage | PostgreSQL or cloud data warehouse |
+| Single-process ingestion | Parallel file-level processing |
+| Per-record duplicate checks | Batched SQL and staging tables |
+| Current-state customer dimension | Slowly Changing Dimensions (SCD Type 2) |
+| CSV and JSONL support | Incremental Parquet processing |
+| Local execution and logging | Airflow orchestration and Prometheus monitoring |
+| Single-writer database | Distributed processing for larger workloads |
 
-Exit codes: `0` ok/skipped, `2` failed, `1` reconciliation mismatch.
+The current implementation intentionally prioritizes correctness, reliability, and reproducibility without introducing unnecessary infrastructure.
 
-## 5. Naming conventions
-snake_case tables/columns; `dim_*` dimensions, `fact_*` facts, `rpt_*` reports, `v_*` views; amounts as integer `*_cents`
-(no floating point); timestamps ISO-8601 UTC `YYYY-MM-DDTHH:MM:SSZ`; every loaded/rejected row carries `run_id`,
-`source_file`, `source_record_no`; IDs are deterministic (`evt_<order#>_<seq>`, `ord_<n>`, `c_<n>`; reject ids = sha1 of file hash + record no + reason); `run_id = run_<UTC time>_<6 hex>`.
+---
 
-## 6. Data & sample files
-* `sample_data/` — starter sample (505 rows, seed 2) with every defect type, plus schema-change / empty / extra-column edge files.
-  `expected_answers.json` is the **separate answer key** (never read by the pipeline; only by `reconcile`).
-* Larger data: `python3 -m order_pipeline generate --rows 1000000 --out-dir big`; fixed seed ⇒ byte-identical output (tested).
-  The generator streams through a bounded heap. All data is synthetic.
-* `sample_output/` — committed evidence: reconciliation reports, CSV reports, run metrics, sample query output,
-  `test_results.txt`, `benchmark_results.md`, and the 150k-row run summary.
+## Project Summary
 
-## 7. Performance (1 CPU, SQLite, see `sample_output/benchmark_results.md`)
+This project demonstrates an end-to-end data engineering workflow covering scalable file ingestion, data validation, relational data modelling, transactional processing, idempotency, recovery, observability, performance optimization, and independent data reconciliation.
 
-| input rows | wall s | rows/s | peak RSS MB |
-|---:|---:|---:|---:|
-| 50,977 | 1.8 | 27.6 k | 43.1 |
-| 203,896 | 7.3 | 28.0 k | 44.1 |
-| 509,794 | 19.4 | 26.3 k | 44.6 |
-
-**Optimisation applied & measured — transaction-per-chunk instead of per-row commit** (30k base events):
-chunk 1 → 7.9 k rows/s, 100 → 22 k, 1,000 → 27.5 k, 10,000 → 28.8 k rows/s. Throughput is ~3.6× better; memory grows
-with chunk size (24 MB at 1 → 44 MB at 10k), so 1,000–10,000 is the sweet spot.
-**Next optimisation (not done):** replace the three per-row lookups (dup check, out-of-order check, insert) with batched
-`executemany` / staging-table + set-based SQL.
-
-## 7b. Known limitations / next steps
-* JSON support is **JSON-Lines** (one object per line). A single giant JSON array needs an incremental parser such as `ijson` (extra dependency).
-* SQLite is single-writer; production would target Postgres/warehouse with `MERGE`, and partition by event date.
-* `dim_customers` is upserted (current-state, no history/SCD2). Facts are fully historical.
-* Amounts are not currency-converted; reports are per currency.
-* Checkpoint resume assumes the same file content (guaranteed by the sha256 key); a changed file is a *new* file.
-* Dedup/ooo checks are per row; fine at ~27 k rows/s, would be batched at larger scale.
-* Next: orchestration (Airflow/Prometheus metrics), Parquet output, parallel file-level workers, schema registry.
-
-See `DESIGN.md` for trade-offs and `docs/DATA_DICTIONARY.md` for schemas.
+**Designed to demonstrate reliable data processing under realistic data quality and operational failure scenarios using a lightweight local architecture.**
