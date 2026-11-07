@@ -1,0 +1,30 @@
+{
+  "chunk_size": 10000,
+  "duration_seconds": 0.037,
+  "entity": "order_events",
+  "failure_reason": null,
+  "file_sha256": "114d8a6a9dc0f13658787da416e368cafa4e5b75645d702d5a28f504b021dc30",
+  "finished_at": "2026-11-07T11:13:06Z",
+  "peak_rss_mb": 22.4,
+  "rejects_by_reason": {
+    "CONFLICTING_DUPLICATE": 2,
+    "DUPLICATE_EVENT": 3,
+    "INVALID_AMOUNT": 3,
+    "INVALID_CURRENCY": 1,
+    "INVALID_EVENT_TYPE": 1,
+    "INVALID_REFERENCE_CUSTOMER": 4,
+    "INVALID_TIMESTAMP": 2,
+    "MALFORMED_ROW": 2,
+    "MISSING_REQUIRED_FIELD": 2
+  },
+  "resumed_after_record": 0,
+  "rows_loaded": 485,
+  "rows_out_of_order": 13,
+  "rows_read": 505,
+  "rows_rejected": 20,
+  "run_id": "run_20261107T111306Z_101345",
+  "source_file": "order_events.csv",
+  "started_at": "2026-11-07T11:13:06Z",
+  "status": "SUCCESS",
+  "warnings": []
+}

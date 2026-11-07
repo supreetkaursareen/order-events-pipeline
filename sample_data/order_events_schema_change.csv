@@ -1,0 +1,2 @@
+event_id,order_id,customer_id,event_type,event_ts,currency,amt
+evt_x_1,ord_x,c_000001,paid,2026-01-01T00:00:00Z,USD,10.00

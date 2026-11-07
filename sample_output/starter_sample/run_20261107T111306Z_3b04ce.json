@@ -1,0 +1,22 @@
+{
+  "chunk_size": 10000,
+  "duration_seconds": 0.003,
+  "entity": "customers",
+  "failure_reason": null,
+  "file_sha256": "17cd9f3e4ec76244e547d0a4575b32f3a50e5e3e8c9503f0b60b674e3d621676",
+  "finished_at": "2026-11-07T11:13:06Z",
+  "peak_rss_mb": 21.5,
+  "rejects_by_reason": {},
+  "resumed_after_record": 0,
+  "rows_loaded": 20,
+  "rows_out_of_order": 0,
+  "rows_read": 20,
+  "rows_rejected": 0,
+  "run_id": "run_20261107T111306Z_3b04ce",
+  "source_file": "customers.csv",
+  "started_at": "2026-11-07T11:13:06Z",
+  "status": "SUCCESS",
+  "warnings": [
+    "ignoring unexpected column(s): country, segment"
+  ]
+}

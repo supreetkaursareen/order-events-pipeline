@@ -1,0 +1,25 @@
+{
+  "run_id": "run_20261107T111050Z_f24dbc",
+  "status": "SUCCESS",
+  "source_file": "order_events.csv",
+  "rows_read": 152931,
+  "rows_loaded": 146392,
+  "rows_rejected": 6539,
+  "rows_out_of_order": 3159,
+  "resumed_after_record": 0,
+  "duration_seconds": 5.444,
+  "peak_rss_mb": 43.8,
+  "failure_reason": null,
+  "rejects_by_reason": {
+    "INVALID_TIMESTAMP": 435,
+    "INVALID_EVENT_TYPE": 483,
+    "INVALID_REFERENCE_CUSTOMER": 601,
+    "INVALID_AMOUNT": 402,
+    "MISSING_REQUIRED_FIELD": 623,
+    "CONFLICTING_DUPLICATE": 729,
+    "INVALID_CURRENCY": 446,
+    "DUPLICATE_EVENT": 2202,
+    "MALFORMED_ROW": 618
+  },
+  "warnings": []
+}

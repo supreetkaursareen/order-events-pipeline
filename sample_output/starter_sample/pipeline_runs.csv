@@ -1,0 +1,3 @@
+run_id,entity,source_file,file_sha256,started_at,finished_at,status,rows_read,rows_loaded,rows_rejected,rows_out_of_order,resumed_after_record,chunk_size,failure_reason
+run_20261107T111306Z_101345,order_events,order_events.csv,114d8a6a9dc0f13658787da416e368cafa4e5b75645d702d5a28f504b021dc30,2026-11-07T11:13:06Z,2026-11-07T11:13:06Z,SUCCESS,505,485,20,13,0,10000,
+run_20261107T111306Z_3b04ce,customers,customers.csv,17cd9f3e4ec76244e547d0a4575b32f3a50e5e3e8c9503f0b60b674e3d621676,2026-11-07T11:13:06Z,2026-11-07T11:13:06Z,SUCCESS,20,20,0,0,0,10000,

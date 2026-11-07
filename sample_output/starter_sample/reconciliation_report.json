@@ -1,0 +1,194 @@
+{
+  "checks": [
+    {
+      "actual": 0,
+      "check": "every run: rows_read = rows_loaded + rows_rejected (runs violating)",
+      "expected": 0,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 505,
+      "check": "file order_events.csv: records committed = sum of rows_read over its runs",
+      "expected": 505,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 485,
+      "check": "fact_order_events rows = sum(rows_loaded) in run log",
+      "expected": 485,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 20,
+      "check": "rejected_records rows = sum(rows_rejected) in run log",
+      "expected": 20,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 0,
+      "check": "duplicate event_id rows",
+      "expected": 0,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 0,
+      "check": "orphan customer_id (referential integrity)",
+      "expected": 0,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 0,
+      "check": "NULL/blank required fields in fact",
+      "expected": 0,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "EUR": 5238763,
+        "GBP": 4422943,
+        "INR": 4980861,
+        "USD": 4461393
+      },
+      "check": "paid cents by currency: fact vs rpt_daily_revenue",
+      "expected": {
+        "EUR": 5238763,
+        "GBP": 4422943,
+        "INR": 4980861,
+        "USD": 4461393
+      },
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "EUR": 77415,
+        "GBP": 356219,
+        "INR": 564481,
+        "USD": 255524
+      },
+      "check": "refunded cents by currency: fact vs rpt_daily_revenue",
+      "expected": {
+        "EUR": 77415,
+        "GBP": 356219,
+        "INR": 564481,
+        "USD": 255524
+      },
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 173,
+      "check": "distinct orders: fact vs v_order_current",
+      "expected": 173,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 485,
+      "check": "events: fact vs sum(event_count) in v_order_current",
+      "expected": 485,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 485,
+      "check": "[expected] events loaded",
+      "expected": 485,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 20,
+      "check": "[expected] events rejected",
+      "expected": 20,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "CONFLICTING_DUPLICATE": 2,
+        "DUPLICATE_EVENT": 3,
+        "INVALID_AMOUNT": 3,
+        "INVALID_CURRENCY": 1,
+        "INVALID_EVENT_TYPE": 1,
+        "INVALID_REFERENCE_CUSTOMER": 4,
+        "INVALID_TIMESTAMP": 2,
+        "MALFORMED_ROW": 2,
+        "MISSING_REQUIRED_FIELD": 2
+      },
+      "check": "[expected] rejects by reason",
+      "expected": {
+        "CONFLICTING_DUPLICATE": 2,
+        "DUPLICATE_EVENT": 3,
+        "INVALID_AMOUNT": 3,
+        "INVALID_CURRENCY": 1,
+        "INVALID_EVENT_TYPE": 1,
+        "INVALID_REFERENCE_CUSTOMER": 4,
+        "INVALID_TIMESTAMP": 2,
+        "MALFORMED_ROW": 2,
+        "MISSING_REQUIRED_FIELD": 2
+      },
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 173,
+      "check": "[expected] distinct orders",
+      "expected": 173,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": 13,
+      "check": "[expected] out-of-order (late) events flagged",
+      "expected": 13,
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "EUR": 5238763,
+        "GBP": 4422943,
+        "INR": 4980861,
+        "USD": 4461393
+      },
+      "check": "[expected] paid cents by currency",
+      "expected": {
+        "EUR": 5238763,
+        "GBP": 4422943,
+        "INR": 4980861,
+        "USD": 4461393
+      },
+      "note": "",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "EUR": 77415,
+        "GBP": 356219,
+        "INR": 564481,
+        "USD": 255524
+      },
+      "check": "[expected] refunded cents by currency",
+      "expected": {
+        "EUR": 77415,
+        "GBP": 356219,
+        "INR": 564481,
+        "USD": 255524
+      },
+      "note": "",
+      "status": "PASS"
+    }
+  ],
+  "checks_failed": 0,
+  "checks_total": 18,
+  "generated_at": "2026-11-07T11:13:06Z",
+  "overall": "PASS"
+}

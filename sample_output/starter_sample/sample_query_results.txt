@@ -1,0 +1,60 @@
+
+== 1. Run log: counts per load attempt
+run_id | entity | source_file | status | rows_read | rows_loaded | rows_rejected | rows_out_of_order
+run_20261107T111306Z_3b04ce | customers | customers.csv | SUCCESS | 20 | 20 | 0 | 0
+run_20261107T111306Z_101345 | order_events | order_events.csv | SUCCESS | 505 | 485 | 20 | 13
+
+== 2. Rejects by reason (data-quality summary)
+reason_code | rows
+INVALID_REFERENCE_CUSTOMER | 4
+DUPLICATE_EVENT | 3
+INVALID_AMOUNT | 3
+CONFLICTING_DUPLICATE | 2
+INVALID_TIMESTAMP | 2
+MALFORMED_ROW | 2
+MISSING_REQUIRED_FIELD | 2
+INVALID_CURRENCY | 1
+
+== 3. Source-to-target reconciliation: read = loaded + rejected
+read | loaded | rejected | unexplained
+505 | 485 | 20 | 0
+
+== 4. Net revenue per day (UTC) and currency
+report_date | currency | paid_events | paid | refunded | net
+2026-01-01 | EUR | 41 | 52387.63 | 774.15 | 51613.48
+2026-01-01 | GBP | 36 | 44229.43 | 0.0 | 44229.43
+2026-01-01 | INR | 39 | 49808.61 | 0.0 | 49808.61
+2026-01-01 | USD | 37 | 44613.93 | 488.78 | 44125.15
+2026-01-02 | GBP | 0 | 0.0 | 1366.48 | -1366.48
+2026-01-03 | GBP | 0 | 0.0 | 906.6 | -906.6
+2026-01-03 | INR | 0 | 0.0 | 1651.21 | -1651.21
+2026-01-03 | USD | 0 | 0.0 | 368.68 | -368.68
+
+== 5. Current order status distribution (derived from event history)
+current_status | orders
+shipped | 121
+paid | 21
+cancelled | 17
+refunded | 14
+
+== 6. Late-arriving events and the orders they touch
+order_id | event_id | event_type | event_ts | source_file | source_record_no
+ord_00000005 | evt_00000005_1 | created | 2026-01-01T00:08:39Z | order_events.csv | 355
+ord_00000008 | evt_00000008_2 | paid | 2026-01-01T01:01:56Z | order_events.csv | 402
+ord_00000025 | evt_00000025_1 | created | 2026-01-01T00:39:13Z | order_events.csv | 425
+ord_00000046 | evt_00000046_1 | created | 2026-01-01T01:13:58Z | order_events.csv | 426
+ord_00000049 | evt_00000049_1 | created | 2026-01-01T01:18:46Z | order_events.csv | 435
+ord_00000094 | evt_00000094_1 | created | 2026-01-01T02:30:34Z | order_events.csv | 440
+ord_00000120 | evt_00000120_1 | created | 2026-01-01T03:14:44Z | order_events.csv | 358
+ord_00000122 | evt_00000122_1 | created | 2026-01-01T03:17:25Z | order_events.csv | 368
+
+== 7. Trace one rejected record back to its source row
+source_file | source_record_no | source_line | reason_code | reason_detail | raw_record
+order_events.csv | 7 | 8 | INVALID_AMOUNT | not a number: 'abc' | ["evt_00000008_1", "ord_00000008", "c_000014", "created", "2026-01-01T00:11:56Z", "GBP", "abc"]
+order_events.csv | 8 | 9 | INVALID_AMOUNT | not finite: 'NaN' | ["evt_00000009_1", "ord_00000009", "c_000017", "created", "2026-01-01T00:14:04Z", "USD", "NaN"]
+order_events.csv | 60 | 61 | MISSING_REQUIRED_FIELD | amount required for created | ["evt_00000048_1", "ord_00000048", "c_000005", "created", "2026-01-01T06:47:28+05:30", "INR", ""]
+order_events.csv | 82 | 83 | MISSING_REQUIRED_FIELD | amount required for created | ["evt_00000062_1", "ord_00000062", "c_000004", "created", "2026-01-01 01:37:03", "GBP", ""]
+order_events.csv | 98 | 99 | MALFORMED_ROW | expected 7 fields, got 8 | ["evt_00000071_1", "ord_00000071", "c_000017", "created", "2026-01-01T01:53:45Z", "EUR", "2209.95", "unexpected_extra_field"]
+
+== 8. Orders whose refunds exceed payments (business anomaly check)
+order_id | paid_cents | refunded_cents

@@ -1,0 +1,10 @@
+entity,source_file,reason_code,rejected_rows
+order_events,order_events.csv,INVALID_REFERENCE_CUSTOMER,4
+order_events,order_events.csv,INVALID_AMOUNT,3
+order_events,order_events.csv,DUPLICATE_EVENT,3
+order_events,order_events.csv,MISSING_REQUIRED_FIELD,2
+order_events,order_events.csv,MALFORMED_ROW,2
+order_events,order_events.csv,INVALID_TIMESTAMP,2
+order_events,order_events.csv,CONFLICTING_DUPLICATE,2
+order_events,order_events.csv,INVALID_EVENT_TYPE,1
+order_events,order_events.csv,INVALID_CURRENCY,1
